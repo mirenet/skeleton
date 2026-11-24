@@ -1,0 +1,82 @@
+package com.webhtml.app;
+
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.Service;
+import android.content.Intent;
+import android.os.Build;
+import android.os.IBinder;
+import androidx.core.app.NotificationCompat;
+
+public class MediaService extends Service {
+
+    private static final String CHANNEL_ID = "MediaServiceChannel";
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        createNotificationChannel();
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        // Kreiramo intent koji vraća korisnika u MainActivity kada klikne na notifikaciju
+        Intent notificationIntent = new Intent(this, MainActivity.class);
+        notificationIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+
+        int flagsPending = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                ? PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
+                : PendingIntent.FLAG_UPDATE_CURRENT;
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, flagsPending);
+
+        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                //.setContentTitle("LFM")
+                .setContentTitle(getString(R.string.app_name))
+                .setContentText("Working in background..")
+                //.setSmallIcon(android.R.drawable.ic_media_play)
+                .setSmallIcon(R.drawable.notify)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .build();
+
+        startForeground(1, notification);
+
+        // VAŽNO: Sprečava Android da samostalno oživi servis nakon uklanjanja iz Recents-a
+        return START_NOT_STICKY;
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        super.onTaskRemoved(rootIntent);
+
+        // 1. Ukloni notifikaciju i ugasi servis
+        stopForeground(STOP_FOREGROUND_REMOVE);
+        stopSelf();
+
+        // 2. Fizički ubij proces aplikacije da ne ostane u kešu
+        android.os.Process.killProcess(android.os.Process.myPid());
+        System.exit(0);
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel serviceChannel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "Media Playback Channel",
+                    NotificationManager.IMPORTANCE_LOW
+            );
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(serviceChannel);
+            }
+        }
+    }
+}
